@@ -354,8 +354,8 @@ main {
   bottom: 0;
 }
 
-.row.up .gutter::before,
-.row.down .gutter::after {
+.up .gutter::before,
+.down .gutter::after {
   display: block;
 }
 
@@ -374,21 +374,21 @@ main {
   transition: border-color 0.2s, background 0.2s;
 }
 
-.row.chain .node {
+.chain .node {
   display: block;
 }
 
-.row.lit .node {
+.lit .node {
   border-color: var(--accent);
   background: var(--accent);
 }
 
-.row.lit .gutter::before,
-.row.lit .gutter::after {
+.lit .gutter::before,
+.lit .gutter::after {
   background: var(--accent);
 }
 
-.row.lit .chip.stack {
+.lit .chip.stack {
   color: var(--accent);
   border-color: var(--accent);
 }
@@ -729,22 +729,26 @@ main {
   overflow-y: auto;
 }
 
+/* The list runs edge to edge, so the rails sit in the dialog's own padding. */
 .snoozed ul {
-  margin: 0 -10px;
+  margin: 0 -24px;
   padding: 0;
   list-style: none;
 }
 
-.snoozed li {
+.snoozed .entry {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 9px 10px;
+  padding-right: 24px;
   border-top: 1px solid var(--line);
 }
 
-.snoozed li.selected {
+.snoozed .entry.selected {
   background: var(--accent-soft);
+}
+
+.snoozed .gutter {
+  align-self: stretch;
 }
 
 .snoozed a {
@@ -753,6 +757,7 @@ main {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  padding: 9px 0;
   color: inherit;
   text-decoration: none;
 }
@@ -761,8 +766,10 @@ main {
   text-decoration: underline;
 }
 
-.snoozed button {
+.snoozed .entry button,
+.snoozed footer button {
   flex: 0 0 auto;
+  margin-left: 12px;
   padding: 4px 10px;
   border: 1px solid var(--line);
   border-radius: 7px;
@@ -773,7 +780,8 @@ main {
   cursor: pointer;
 }
 
-.snoozed button:hover {
+.snoozed .entry button:hover,
+.snoozed footer button:hover {
   background: var(--sunk);
   border-color: var(--muted);
 }

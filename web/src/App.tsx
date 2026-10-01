@@ -22,6 +22,7 @@ const SHORTCUTS: [string[], string][] = [
   [["s"], "Snooze until tomorrow"],
   [["z"], "Show snoozed"],
   [["u"], "Unsnooze, in the snoozed list"],
+  [["U"], "Unsnooze the whole chain, in the snoozed list"],
   [["r"], "Refresh now"],
   [["/"], "Filter"],
   [["esc"], "Clear filter"],
@@ -161,6 +162,12 @@ function collapse(items: Item[], single: boolean, expanded: (chain: string) => b
   return { visible, hidden, collapsible };
 }
 
+function chainChip(item: Item) {
+  return item.chain
+    ? `${item.chain.position}/${item.chain.total}${item.chain.parent ? ` · on #${item.chain.parent}` : ""}`
+    : item.stacked_on && `on ${item.stacked_on}`;
+}
+
 function Avatar({ person, state }: { person: Person; state?: Reviewer["state"] }) {
   const src = person.avatar_url && `${person.avatar_url}${person.avatar_url.includes("?") ? "&" : "?"}s=48`;
   return (
@@ -189,9 +196,7 @@ function Row({ item, compact, selected, lit, up, down, index, now, viewer, onSel
   const requested = new Date(item.requested_at).getTime();
   const stale = !compact && now - requested > STALE_MS;
   const classes = ["row", compact && "compact", selected && "selected", item.chain && "chain", lit && "lit", up && "up", down && "down"];
-  const chip = item.chain
-    ? `${item.chain.position}/${item.chain.total}${item.chain.parent ? ` · on #${item.chain.parent}` : ""}`
-    : item.stacked_on && `on ${item.stacked_on}`;
+  const chip = chainChip(item);
   const reviewers = item.reviewers.slice(0, 5).map((reviewer) => (
     <Avatar key={reviewer.login} person={reviewer.me ? viewer : reviewer} state={reviewer.state} />
   ));
@@ -281,10 +286,16 @@ export function App() {
     };
     return { mine: build("mine", data?.needs_you ?? []), rest: build("rest", data?.not_blocked ?? []) };
   }, [data, filter, expanded, collapseChains, isSnoozed]);
-  const snoozed = useMemo(
-    () => [...(data?.needs_you ?? []), ...(data?.not_blocked ?? [])].filter((i) => isSnoozed(i.url)),
-    [data, isSnoozed],
-  );
+  const snoozed = useMemo(() => {
+    const items = [...(data?.needs_you ?? []), ...(data?.not_blocked ?? [])].filter((i) => isSnoozed(i.url));
+    // A chain can be split across the two sections, so bring its members back together.
+    const chains = new Map<string, Item[]>();
+    for (const item of items) {
+      const key = item.chain?.id ?? item.url;
+      chains.set(key, [...(chains.get(key) ?? []), item]);
+    }
+    return [...chains.values()].flatMap((members) => members.sort((a, b) => a.chain!.position - b.chain!.position));
+  }, [data, isSnoozed]);
   const currentSnoozed = snoozed.find((i) => i.url === selectedSnoozed) ?? snoozed[0];
   const all = useMemo(() => [...sections.mine.visible, ...sections.rest.visible], [sections]);
   const current = all.find((i) => i.url === selected) ?? all[0];
@@ -336,13 +347,20 @@ export function App() {
     [all, collapseChains, current, data, isSnoozed, snooze, select],
   );
 
-  const unsnoozeItem = useCallback(
-    (item: Item) => {
-      const index = snoozed.indexOf(item);
-      unsnooze([item.url]);
-      if (item === currentSnoozed) select(snoozed[index + 1] ?? snoozed[index - 1], true);
+  const unsnoozeItems = useCallback(
+    (items: Item[]) => {
+      unsnooze(items.map((i) => i.url));
+      if (items.includes(currentSnoozed)) {
+        const index = snoozed.indexOf(currentSnoozed);
+        const remains = (i: Item) => !items.includes(i);
+        select(snoozed.slice(index + 1).find(remains) ?? snoozed.slice(0, index).reverse().find(remains), true);
+      }
     },
     [snoozed, currentSnoozed, unsnooze, select],
+  );
+  const snoozedChain = useCallback(
+    (item: Item) => (item.chain ? snoozed.filter((i) => i.chain?.id === item.chain!.id) : [item]),
+    [snoozed],
   );
 
   const toggleChain = useCallback(
@@ -381,7 +399,8 @@ export function App() {
         g: () => select(snoozed[0], true),
         G: () => select(snoozed[snoozed.length - 1], true),
         o: () => currentSnoozed && window.open(currentSnoozed.url, "_blank", "noreferrer"),
-        u: () => currentSnoozed && unsnoozeItem(currentSnoozed),
+        u: () => currentSnoozed && unsnoozeItems([currentSnoozed]),
+        U: () => currentSnoozed && unsnoozeItems(snoozedChain(currentSnoozed)),
         z: () => setShowSnoozed(false),
       };
       const listActions: Record<string, () => void> = {
@@ -413,7 +432,7 @@ export function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [all, current, currentSnoozed, filter, load, sections, select, showSnoozed, snoozed, snoozeItem, toggleChain, toggleCollapseChains, unsnoozeItem]);
+  }, [all, current, currentSnoozed, filter, load, sections, select, showSnoozed, snoozed, snoozedChain, snoozeItem, toggleChain, toggleCollapseChains, unsnoozeItems]);
 
   const section = (title: string, { kind, total, visible, hidden, collapsible }: typeof sections.mine, offset: number) => (
     <section className={`section ${kind}`}>
@@ -561,23 +580,43 @@ export function App() {
           <div className="dialog snoozed" role="dialog" aria-label="Snoozed pull requests" onClick={(e) => e.stopPropagation()}>
             <h2>Snoozed until tomorrow</h2>
             <ul>
-              {snoozed.map((item) => (
-                <li
-                  key={item.url}
-                  className={item === currentSnoozed ? "selected" : undefined}
-                  data-url={item.url}
-                  onClick={() => setSelectedSnoozed(item.url)}
-                >
-                  <a href={item.url} target="_blank" rel="noreferrer">
-                    <span className="ref">
-                      <span>{item.repo}</span>
-                      <span>#{item.number}</span>
-                    </span>
-                    <span className="title">{item.title}</span>
-                  </a>
-                  <button onClick={() => unsnoozeItem(item)}>Unsnooze</button>
-                </li>
-              ))}
+              {snoozed.map((item, i) => {
+                const chain = item.chain?.id;
+                const up = !!chain && snoozed[i - 1]?.chain?.id === chain;
+                const last = !!chain && snoozed[i + 1]?.chain?.id !== chain;
+                const lit = !!chain && chain === currentSnoozed?.chain?.id;
+                const chip = chainChip(item);
+                // Unsnoozing a chain is only offered when several of its members are snoozed.
+                const whole = last && up;
+                const classes = ["entry", item === currentSnoozed && "selected", chain && "chain", lit && "lit", up && "up", (!last || whole) && "down"];
+                return (
+                  <Fragment key={item.url}>
+                    <li className={classes.filter(Boolean).join(" ")} data-url={item.url} onClick={() => setSelectedSnoozed(item.url)}>
+                      <span className="gutter">
+                        <i className="node" />
+                      </span>
+                      <a href={item.url} target="_blank" rel="noreferrer">
+                        <span className="ref">
+                          <span>{item.repo}</span>
+                          <span>#{item.number}</span>
+                          {chip && <span className="chip stack">{chip}</span>}
+                        </span>
+                        <span className="title">{item.title}</span>
+                      </a>
+                      <button onClick={() => unsnoozeItems([item])}>Unsnooze</button>
+                    </li>
+                    {whole && (
+                      <li>
+                        <button className={lit ? "more lit" : "more"} onClick={() => unsnoozeItems(snoozedChain(item))}>
+                          <span className="gutter" />
+                          Unsnooze these {snoozedChain(item).length}
+                          <kbd>U</kbd>
+                        </button>
+                      </li>
+                    )}
+                  </Fragment>
+                );
+              })}
             </ul>
             <footer>
               <span><kbd>j</kbd><kbd>k</kbd> move</span>
