@@ -5,6 +5,7 @@ const POLL_MS = 30_000;
 const STALE_MS = 3 * 24 * 60 * 60 * 1000;
 /** Chains with more members than this in a section collapse to their first few. */
 const CHAIN_PREVIEW = 3;
+const SNOOZE_KEY = "docket:snoozed";
 
 const SHORTCUTS: [string[], string][] = [
   [["j", "↓"], "Next pull request"],
@@ -14,6 +15,9 @@ const SHORTCUTS: [string[], string][] = [
   [["↵", "o"], "Open on GitHub"],
   [["e"], "Expand or collapse a long chain"],
   [["c"], "Copy link"],
+  [["s"], "Snooze until tomorrow"],
+  [["z"], "Show snoozed"],
+  [["u"], "Unsnooze, in the snoozed list"],
   [["r"], "Refresh now"],
   [["/"], "Filter"],
   [["esc"], "Clear filter"],
@@ -62,6 +66,50 @@ function useNow(everyMs: number) {
     return () => clearInterval(timer);
   }, [everyMs]);
   return now;
+}
+
+function storedSnoozes(): Record<string, number> {
+  try {
+    return JSON.parse(localStorage.getItem(SNOOZE_KEY) ?? "{}");
+  } catch {
+    return {};
+  }
+}
+
+/** Snoozed pull requests, by URL, with the time each one wakes up. */
+function useSnoozed(now: number) {
+  const [until, setUntil] = useState(storedSnoozes);
+
+  useEffect(() => localStorage.setItem(SNOOZE_KEY, JSON.stringify(until)), [until]);
+
+  const update = useCallback((change: (next: Record<string, number>) => void) => {
+    setUntil((previous) => {
+      // Drop expired entries here so storage doesn't grow forever.
+      const next = Object.fromEntries(Object.entries(previous).filter(([, time]) => time > Date.now()));
+      change(next);
+      return next;
+    });
+  }, []);
+
+  const snooze = useCallback(
+    (url: string) =>
+      update((next) => {
+        const midnight = new Date();
+        midnight.setHours(24, 0, 0, 0);
+        next[url] = midnight.getTime();
+      }),
+    [update],
+  );
+  const unsnooze = useCallback(
+    (urls: string[]) =>
+      update((next) => {
+        for (const url of urls) delete next[url];
+      }),
+    [update],
+  );
+  const isSnoozed = useCallback((url: string) => (until[url] ?? 0) > now, [until, now]);
+
+  return { isSnoozed, snooze, unsnooze };
 }
 
 function ago(from: number, now: number) {
@@ -126,10 +174,11 @@ interface RowProps {
   now: number;
   viewer: Person;
   onSelect: (url: string) => void;
+  onSnooze: (item: Item) => void;
   onHover: (chain: string | null) => void;
 }
 
-function Row({ item, compact, selected, lit, up, down, index, now, viewer, onSelect, onHover }: RowProps) {
+function Row({ item, compact, selected, lit, up, down, index, now, viewer, onSelect, onSnooze, onHover }: RowProps) {
   const requested = new Date(item.requested_at).getTime();
   const stale = !compact && now - requested > STALE_MS;
   const classes = ["row", compact && "compact", selected && "selected", item.chain && "chain", lit && "lit", up && "up", down && "down"];
@@ -176,6 +225,20 @@ function Row({ item, compact, selected, lit, up, down, index, now, viewer, onSel
         )}
         {!compact && item.ci && <span className={`ci ${item.ci}`} title={`Checks: ${item.ci}`} />}
         <span className="avatars">{reviewers}</span>
+        <button
+          className="snooze"
+          title="Snooze until tomorrow (s)"
+          aria-label="Snooze until tomorrow"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onSnooze(item);
+          }}
+        >
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round">
+            <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
+          </svg>
+        </button>
       </span>
     </a>
   );
@@ -188,6 +251,9 @@ export function App() {
   const [hovered, setHovered] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
   const [help, setHelp] = useState(false);
+  const [showSnoozed, setShowSnoozed] = useState(false);
+  const [selectedSnoozed, setSelectedSnoozed] = useState<string | null>(null);
+  const { isSnoozed, snooze, unsnooze } = useSnoozed(now);
   const [toast, setToast] = useState<string | null>(null);
   const filterInput = useRef<HTMLInputElement>(null);
 
@@ -195,19 +261,28 @@ export function App() {
 
   const sections = useMemo(() => {
     const build = (kind: "mine" | "rest", items: Item[]) => {
-      const matching = items.filter((i) => matches(i, filter));
+      const matching = items.filter((i) => !isSnoozed(i.url) && matches(i, filter));
       return { kind, total: matching.length, ...collapse(matching, (id) => !!filter || expanded.has(`${kind}:${id}`)) };
     };
     return { mine: build("mine", data?.needs_you ?? []), rest: build("rest", data?.not_blocked ?? []) };
-  }, [data, filter, expanded]);
+  }, [data, filter, expanded, isSnoozed]);
+  const snoozed = useMemo(
+    () => [...(data?.needs_you ?? []), ...(data?.not_blocked ?? [])].filter((i) => isSnoozed(i.url)),
+    [data, isSnoozed],
+  );
+  const currentSnoozed = snoozed.find((i) => i.url === selectedSnoozed) ?? snoozed[0];
   const all = useMemo(() => [...sections.mine.visible, ...sections.rest.visible], [sections]);
   const current = all.find((i) => i.url === selected) ?? all[0];
   const litChain = hovered ?? current?.chain?.id ?? null;
 
   useEffect(() => {
-    const count = data?.needs_you.length;
+    const count = data?.needs_you.filter((i) => !isSnoozed(i.url)).length;
     document.title = count ? `(${count}) Docket` : "Docket";
-  }, [data]);
+  }, [data, isSnoozed]);
+
+  useEffect(() => {
+    if (!snoozed.length) setShowSnoozed(false);
+  }, [snoozed]);
 
   useEffect(() => {
     if (!toast) return;
@@ -215,13 +290,32 @@ export function App() {
     return () => clearTimeout(timer);
   }, [toast]);
 
-  const select = useCallback((item: Item | undefined) => {
+  const select = useCallback((item: Item | undefined, snoozed = false) => {
     if (!item) return;
-    setSelected(item.url);
+    (snoozed ? setSelectedSnoozed : setSelected)(item.url);
     requestAnimationFrame(() =>
       document.querySelector(`[data-url="${item.url}"]`)?.scrollIntoView({ block: "nearest", behavior: "smooth" }),
     );
   }, []);
+
+  const snoozeItem = useCallback(
+    (item: Item) => {
+      const index = all.indexOf(item);
+      snooze(item.url);
+      if (item === current) select(all[index + 1] ?? all[index - 1]);
+      setToast(`Snoozed #${item.number} until tomorrow`);
+    },
+    [all, current, snooze, select],
+  );
+
+  const unsnoozeItem = useCallback(
+    (item: Item) => {
+      const index = snoozed.indexOf(item);
+      unsnooze([item.url]);
+      if (item === currentSnoozed) select(snoozed[index + 1] ?? snoozed[index - 1], true);
+    },
+    [snoozed, currentSnoozed, unsnooze, select],
+  );
 
   const toggleChain = useCallback(
     (kind: "mine" | "rest", chain: string) => {
@@ -244,13 +338,25 @@ export function App() {
 
       if (e.key === "Escape") {
         setHelp(false);
+        setShowSnoozed(false);
         setFilter("");
         filterInput.current?.blur();
         return;
       }
       if (typing && !["ArrowDown", "ArrowUp", "Enter"].includes(e.key)) return;
+      if (e.key === "Enter" && e.target instanceof HTMLButtonElement) return;
 
-      const actions: Record<string, () => void> = {
+      const snoozedIndex = snoozed.indexOf(currentSnoozed);
+      const snoozedActions: Record<string, () => void> = {
+        j: () => select(snoozed[Math.min(snoozedIndex + 1, snoozed.length - 1)], true),
+        k: () => select(snoozed[Math.max(snoozedIndex - 1, 0)], true),
+        g: () => select(snoozed[0], true),
+        G: () => select(snoozed[snoozed.length - 1], true),
+        o: () => currentSnoozed && window.open(currentSnoozed.url, "_blank", "noreferrer"),
+        u: () => currentSnoozed && unsnoozeItem(currentSnoozed),
+        z: () => setShowSnoozed(false),
+      };
+      const listActions: Record<string, () => void> = {
         j: () => select(all[Math.min(index + 1, all.length - 1)]),
         k: () => select(all[Math.max(index - 1, 0)]),
         g: () => select(all[0]),
@@ -263,12 +369,14 @@ export function App() {
           const chain = current?.chain?.id;
           if (chain && !filter && sections[kind].collapsible(chain)) toggleChain(kind, chain);
         },
+        s: () => current && snoozeItem(current),
+        z: () => setShowSnoozed(snoozed.length > 0),
         r: () => load(true),
         "/": () => filterInput.current?.focus(),
         "?": () => setHelp((open) => !open),
       };
       const aliases: Record<string, string> = { ArrowDown: "j", ArrowUp: "k", Enter: "o" };
-      const action = actions[aliases[e.key] ?? e.key];
+      const action = (showSnoozed ? snoozedActions : listActions)[aliases[e.key] ?? e.key];
       if (!action) return;
       e.preventDefault();
       if (typing && e.key === "Enter") filterInput.current?.blur();
@@ -276,13 +384,18 @@ export function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [all, current, filter, load, sections, select, toggleChain]);
+  }, [all, current, currentSnoozed, filter, load, sections, select, showSnoozed, snoozed, snoozeItem, toggleChain, unsnoozeItem]);
 
   const section = (title: string, { kind, total, visible, hidden, collapsible }: typeof sections.mine, offset: number) => (
     <section className={`section ${kind}`}>
       <header>
         <h2>{title}</h2>
         <span className="count">{total}</span>
+        {kind === "mine" && snoozed.length > 0 && (
+          <button className="snoozed-link" onClick={() => setShowSnoozed(true)} title="Show snoozed (z)">
+            {snoozed.length} snoozed
+          </button>
+        )}
       </header>
       {visible.length > 0 ? (
         <div className="list">
@@ -303,6 +416,7 @@ export function App() {
                   now={now}
                   viewer={data!.viewer}
                   onSelect={setSelected}
+                  onSnooze={snoozeItem}
                   onHover={setHovered}
                 />
                 {toggle && (
@@ -378,13 +492,14 @@ export function App() {
         <span><kbd>j</kbd><kbd>k</kbd> move</span>
         <span><kbd>↵</kbd> open</span>
         <span><kbd>c</kbd> copy link</span>
+        <span><kbd>s</kbd> snooze</span>
         <span><kbd>r</kbd> refresh</span>
         <span><kbd>?</kbd> all shortcuts</span>
       </footer>
 
       {help && (
         <div className="overlay" onClick={() => setHelp(false)}>
-          <div className="help" role="dialog" aria-label="Keyboard shortcuts" onClick={(e) => e.stopPropagation()}>
+          <div className="dialog" role="dialog" aria-label="Keyboard shortcuts" onClick={(e) => e.stopPropagation()}>
             <h2>Keyboard shortcuts</h2>
             <dl>
               {SHORTCUTS.map(([keys, label]) => (
@@ -398,6 +513,39 @@ export function App() {
                 </div>
               ))}
             </dl>
+          </div>
+        </div>
+      )}
+
+      {showSnoozed && (
+        <div className="overlay" onClick={() => setShowSnoozed(false)}>
+          <div className="dialog snoozed" role="dialog" aria-label="Snoozed pull requests" onClick={(e) => e.stopPropagation()}>
+            <h2>Snoozed until tomorrow</h2>
+            <ul>
+              {snoozed.map((item) => (
+                <li
+                  key={item.url}
+                  className={item === currentSnoozed ? "selected" : undefined}
+                  data-url={item.url}
+                  onClick={() => setSelectedSnoozed(item.url)}
+                >
+                  <a href={item.url} target="_blank" rel="noreferrer">
+                    <span className="ref">
+                      <span>{item.repo}</span>
+                      <span>#{item.number}</span>
+                    </span>
+                    <span className="title">{item.title}</span>
+                  </a>
+                  <button onClick={() => unsnoozeItem(item)}>Unsnooze</button>
+                </li>
+              ))}
+            </ul>
+            <footer>
+              <span><kbd>j</kbd><kbd>k</kbd> move</span>
+              <span><kbd>↵</kbd> open</span>
+              <span><kbd>u</kbd> unsnooze</span>
+              {snoozed.length > 1 && <button onClick={() => unsnooze(snoozed.map((i) => i.url))}>Unsnooze all</button>}
+            </footer>
           </div>
         </div>
       )}

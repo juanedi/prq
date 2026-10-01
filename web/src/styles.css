@@ -225,6 +225,22 @@ main {
   color: var(--accent);
 }
 
+.snoozed-link {
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.snoozed-link:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
 .empty {
   margin: 0;
   padding: 18px 4px;
@@ -487,6 +503,36 @@ main {
   background: var(--bad);
 }
 
+.snooze {
+  display: grid;
+  margin: 0 -4px 0 -6px;
+  padding: 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.row:hover .snooze,
+.row.selected .snooze,
+.snooze:focus-visible {
+  opacity: 1;
+}
+
+.snooze:hover {
+  color: var(--ink);
+  background: var(--line);
+}
+
+@media (hover: none) {
+  .snooze {
+    opacity: 1;
+  }
+}
+
 .more {
   display: flex;
   align-items: center;
@@ -612,7 +658,7 @@ main {
   }
 }
 
-.help {
+.dialog {
   width: min(380px, 100%);
   padding: 22px 24px;
   border: 1px solid var(--line);
@@ -622,28 +668,104 @@ main {
   animation: rise 0.2s ease-out backwards;
 }
 
-.help h2 {
+.dialog h2 {
   margin: 0 0 14px;
   font-size: 16px;
 }
 
-.help dl {
+.dialog dl {
   margin: 0;
   display: flex;
   flex-direction: column;
   gap: 9px;
 }
 
-.help dl div {
+.dialog dl div {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
-.help dd {
+.dialog dd {
   margin: 0;
   display: flex;
   gap: 4px;
+}
+
+.dialog.snoozed {
+  width: min(520px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+}
+
+.snoozed ul {
+  margin: 0 -10px;
+  padding: 0;
+  list-style: none;
+}
+
+.snoozed li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 10px;
+  border-top: 1px solid var(--line);
+}
+
+.snoozed li.selected {
+  background: var(--accent-soft);
+}
+
+.snoozed a {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.snoozed a:hover .title {
+  text-decoration: underline;
+}
+
+.snoozed button {
+  flex: 0 0 auto;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.snoozed button:hover {
+  background: var(--sunk);
+  border-color: var(--muted);
+}
+
+.snoozed footer {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 28px;
+  margin-top: 12px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.snoozed footer span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.snoozed footer button {
+  margin-left: auto;
+  color: var(--ink);
 }
 
 .toast {
