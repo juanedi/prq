@@ -5,7 +5,10 @@ const POLL_MS = 30_000;
 const STALE_MS = 3 * 24 * 60 * 60 * 1000;
 /** Chains with more members than this in a section collapse to their first few. */
 const CHAIN_PREVIEW = 3;
+const TOAST_MS = 1600;
+const WARNING_MS = 4500;
 const SNOOZE_KEY = "docket:snoozed";
+const COLLAPSE_KEY = "docket:collapse-chains";
 
 const SHORTCUTS: [string[], string][] = [
   [["j", "↓"], "Next pull request"],
@@ -14,6 +17,7 @@ const SHORTCUTS: [string[], string][] = [
   [["G"], "Jump to the bottom"],
   [["↵", "o"], "Open on GitHub"],
   [["e"], "Expand or collapse a long chain"],
+  [["E"], "Collapse every chain into one entry"],
   [["c"], "Copy link"],
   [["s"], "Snooze until tomorrow"],
   [["z"], "Show snoozed"],
@@ -92,11 +96,11 @@ function useSnoozed(now: number) {
   }, []);
 
   const snooze = useCallback(
-    (url: string) =>
+    (urls: string[]) =>
       update((next) => {
         const midnight = new Date();
         midnight.setHours(24, 0, 0, 0);
-        next[url] = midnight.getTime();
+        for (const url of urls) next[url] = midnight.getTime();
       }),
     [update],
   );
@@ -131,26 +135,29 @@ function matches(item: Item, filter: string) {
     .every((word) => haystack.includes(word));
 }
 
-function collapse(items: Item[], expanded: (chain: string) => boolean) {
+function collapse(items: Item[], single: boolean, expanded: (chain: string) => boolean) {
   const sizes = new Map<string, number>();
   for (const { chain } of items) if (chain) sizes.set(chain.id, (sizes.get(chain.id) ?? 0) + 1);
+
+  const preview = single ? 1 : CHAIN_PREVIEW;
+  // Outside single mode, a chain just one over the preview isn't worth collapsing.
+  const collapsible = (id: string) => sizes.get(id)! > (single ? 1 : CHAIN_PREVIEW + 1);
 
   const visible: Item[] = [];
   const hidden = new Map<string, number>();
   const shown = new Map<string, number>();
   for (const item of items) {
     const id = item.chain?.id;
-    if (id && sizes.get(id)! > CHAIN_PREVIEW + 1 && !expanded(id)) {
+    if (id && collapsible(id) && !expanded(id)) {
       const count = shown.get(id) ?? 0;
       shown.set(id, count + 1);
-      if (count >= CHAIN_PREVIEW) {
+      if (count >= preview) {
         hidden.set(id, (hidden.get(id) ?? 0) + 1);
         continue;
       }
     }
     visible.push(item);
   }
-  const collapsible = (id: string) => sizes.get(id)! > CHAIN_PREVIEW + 1;
   return { visible, hidden, collapsible };
 }
 
@@ -254,18 +261,26 @@ export function App() {
   const [showSnoozed, setShowSnoozed] = useState(false);
   const [selectedSnoozed, setSelectedSnoozed] = useState<string | null>(null);
   const { isSnoozed, snooze, unsnooze } = useSnoozed(now);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ text: string; warning?: boolean } | null>(null);
+  const [toastOn, setToastOn] = useState(false);
   const filterInput = useRef<HTMLInputElement>(null);
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [collapseChains, setCollapseChains] = useState(() => localStorage.getItem(COLLAPSE_KEY) === "true");
+  const toggleCollapseChains = useCallback(() => {
+    setCollapseChains((on) => !on);
+    setExpanded(new Set());
+  }, []);
+
+  useEffect(() => localStorage.setItem(COLLAPSE_KEY, String(collapseChains)), [collapseChains]);
 
   const sections = useMemo(() => {
     const build = (kind: "mine" | "rest", items: Item[]) => {
       const matching = items.filter((i) => !isSnoozed(i.url) && matches(i, filter));
-      return { kind, total: matching.length, ...collapse(matching, (id) => !!filter || expanded.has(`${kind}:${id}`)) };
+      return { kind, total: matching.length, ...collapse(matching, collapseChains, (id) => !!filter || expanded.has(`${kind}:${id}`)) };
     };
     return { mine: build("mine", data?.needs_you ?? []), rest: build("rest", data?.not_blocked ?? []) };
-  }, [data, filter, expanded, isSnoozed]);
+  }, [data, filter, expanded, collapseChains, isSnoozed]);
   const snoozed = useMemo(
     () => [...(data?.needs_you ?? []), ...(data?.not_blocked ?? [])].filter((i) => isSnoozed(i.url)),
     [data, isSnoozed],
@@ -286,7 +301,9 @@ export function App() {
 
   useEffect(() => {
     if (!toast) return;
-    const timer = setTimeout(() => setToast(null), 1600);
+    // The toast keeps its content after it is dismissed, so it doesn't change while fading out.
+    setToastOn(true);
+    const timer = setTimeout(() => setToastOn(false), toast.warning ? WARNING_MS : TOAST_MS);
     return () => clearTimeout(timer);
   }, [toast]);
 
@@ -300,12 +317,23 @@ export function App() {
 
   const snoozeItem = useCallback(
     (item: Item) => {
-      const index = all.indexOf(item);
-      snooze(item.url);
-      if (item === current) select(all[index + 1] ?? all[index - 1]);
-      setToast(`Snoozed #${item.number} until tomorrow`);
+      const chain = collapseChains && item.chain?.id;
+      const gone = chain
+        ? [...(data?.needs_you ?? []), ...(data?.not_blocked ?? [])].filter((i) => i.chain?.id === chain && !isSnoozed(i.url))
+        : [item];
+      snooze(gone.map((i) => i.url));
+      if (current && gone.includes(current)) {
+        const index = all.indexOf(current);
+        const remains = (i: Item) => !gone.includes(i);
+        select(all.slice(index + 1).find(remains) ?? all.slice(0, index).reverse().find(remains));
+      }
+      setToast(
+        gone.length > 1
+          ? { text: `Snoozed the whole chain: ${gone.length} pull requests`, warning: true }
+          : { text: `Snoozed #${item.number} until tomorrow` },
+      );
     },
-    [all, current, snooze, select],
+    [all, collapseChains, current, data, isSnoozed, snooze, select],
   );
 
   const unsnoozeItem = useCallback(
@@ -363,7 +391,7 @@ export function App() {
         G: () => select(all[all.length - 1]),
         o: () => current && window.open(current.url, "_blank", "noreferrer"),
         c: () =>
-          current && navigator.clipboard.writeText(current.url).then(() => setToast(`Copied link to #${current.number}`)),
+          current && navigator.clipboard.writeText(current.url).then(() => setToast({ text: `Copied link to #${current.number}` })),
         e: () => {
           const kind = sections.mine.visible.includes(current!) ? "mine" : "rest";
           const chain = current?.chain?.id;
@@ -371,6 +399,7 @@ export function App() {
         },
         s: () => current && snoozeItem(current),
         z: () => setShowSnoozed(snoozed.length > 0),
+        E: toggleCollapseChains,
         r: () => load(true),
         "/": () => filterInput.current?.focus(),
         "?": () => setHelp((open) => !open),
@@ -384,7 +413,7 @@ export function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [all, current, currentSnoozed, filter, load, sections, select, showSnoozed, snoozed, snoozeItem, toggleChain, unsnoozeItem]);
+  }, [all, current, currentSnoozed, filter, load, sections, select, showSnoozed, snoozed, snoozeItem, toggleChain, toggleCollapseChains, unsnoozeItem]);
 
   const section = (title: string, { kind, total, visible, hidden, collapsible }: typeof sections.mine, offset: number) => (
     <section className={`section ${kind}`}>
@@ -459,6 +488,16 @@ export function App() {
           />
           <kbd>/</kbd>
         </label>
+        <button
+          className="switch"
+          role="switch"
+          aria-checked={collapseChains}
+          onClick={toggleCollapseChains}
+          title="Show each chain as one entry (E)"
+        >
+          <i />
+          Collapse chains
+        </button>
         <button className="sync" onClick={() => load(true)} title="Refresh (r)">
           <span className={busy ? "dot busy" : error ? "dot error" : "dot"} />
           {data ? `Synced ${ago(data.fetched_at, now)}` : busy ? "Loading" : "Not synced"}
@@ -550,8 +589,8 @@ export function App() {
         </div>
       )}
 
-      <div className={toast ? "toast on" : "toast"} role="status">
-        {toast}
+      <div className={["toast", toastOn && "on", toast?.warning && "warning"].filter(Boolean).join(" ")} role="status">
+        {toast?.text}
       </div>
     </div>
   );
