@@ -1,0 +1,11 @@
+# Copy to ./config.toml or ~/.config/docket/config.toml. Every setting is optional.
+
+# Only look at these organizations (or users). Omit to include everything you can see.
+# orgs = ["acme"]
+
+# Only look at these repositories. Use "owner/name", or a bare "name" to match it in any org.
+# Omit to include every repository.
+# repos = ["acme/web", "api"]
+
+# port = 4747
+# refresh_seconds = 60

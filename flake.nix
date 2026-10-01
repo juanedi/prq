@@ -19,7 +19,7 @@
             rust-analyzer
             nodejs_22
             just
-          ] ++ lib.optionals stdenv.isDarwin [ libiconv ];
+          ] ++ lib.optionals stdenv.hostPlatform.isDarwin [ libiconv ];
 
           RUST_SRC_PATH = "${pkgs.rustPlatform.rustLibSrc}";
         };
