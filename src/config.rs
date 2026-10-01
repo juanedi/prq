@@ -38,11 +38,17 @@ impl Config {
             }
         }
 
+        let candidates = default_paths();
         let path = match explicit {
             Some(path) => Some(path),
-            None => default_paths().into_iter().find(|p| p.exists()),
+            None => candidates.iter().find(|p| p.exists()).cloned(),
         };
         let Some(path) = path else {
+            let looked: Vec<String> = candidates.iter().map(|p| p.display().to_string()).collect();
+            eprintln!(
+                "config: none found, using defaults (looked in {})",
+                looked.join(", ")
+            );
             return Ok(Config::default());
         };
 
