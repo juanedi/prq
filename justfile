@@ -8,6 +8,7 @@ setup:
 dev:
     #!/usr/bin/env bash
     trap 'kill 0' EXIT
+    mkdir -p web/dist
     cargo run &
     cd web && npm run dev
 
@@ -17,6 +18,7 @@ build:
     cargo build --release
 
 check:
+    mkdir -p web/dist
     cargo fmt --check
     cargo clippy -- -D warnings
     cd web && npx tsc --noEmit
