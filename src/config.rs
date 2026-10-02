@@ -2,6 +2,8 @@ use anyhow::{Context, Result};
 use serde::Deserialize;
 use std::path::PathBuf;
 
+const TEMPLATE: &str = include_str!("../config.example.toml");
+
 #[derive(Debug, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Config {
@@ -58,11 +60,7 @@ impl Config {
             None => candidates.iter().find(|p| p.exists()).cloned(),
         };
         let Some(path) = path else {
-            let looked: Vec<String> = candidates.iter().map(|p| p.display().to_string()).collect();
-            eprintln!(
-                "config: none found, using defaults (looked in {})",
-                looked.join(", ")
-            );
+            init_user_config();
             return Ok(Config::default());
         };
 
@@ -97,13 +95,37 @@ impl Config {
 
 fn default_paths() -> Vec<PathBuf> {
     let mut paths = vec![PathBuf::from("config.toml")];
+    paths.extend(user_path());
+    paths
+}
+
+fn user_path() -> Option<PathBuf> {
     let config_home = std::env::var_os("XDG_CONFIG_HOME")
         .map(PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".config")));
-    if let Some(dir) = config_home {
-        paths.push(dir.join("docket/config.toml"));
+        .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".config")))?;
+    Some(config_home.join("docket/config.toml"))
+}
+
+/// Writes the template, with every setting commented out, so new users discover the file.
+fn init_user_config() {
+    let Some(path) = user_path() else {
+        eprintln!("config: none found, using defaults");
+        return;
+    };
+    let written = path
+        .parent()
+        .map_or(Ok(()), std::fs::create_dir_all)
+        .and_then(|()| std::fs::write(&path, TEMPLATE));
+    match written {
+        Ok(()) => eprintln!(
+            "config: none found, created {} with every setting commented out; edit it to customize",
+            path.display()
+        ),
+        Err(error) => eprintln!(
+            "config: none found, using defaults (could not create {}: {error})",
+            path.display()
+        ),
     }
-    paths
 }
 
 #[cfg(test)]
@@ -122,5 +144,11 @@ mod tests {
         assert!(!config.allows("acme/docs"));
         assert!(!config.allows("other/web"));
         assert!(Config::default().allows("anyone/anything"));
+    }
+
+    #[test]
+    fn template_keeps_the_defaults() {
+        let config: Config = toml::from_str(TEMPLATE).unwrap();
+        assert_eq!(format!("{config:?}"), format!("{:?}", Config::default()));
     }
 }

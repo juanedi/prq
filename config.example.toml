@@ -1,4 +1,5 @@
-# Copy to ./config.toml or ~/.config/docket/config.toml. Every setting is optional.
+# Docket reads ./config.toml, then ~/.config/docket/config.toml.
+# Every setting is optional; uncomment one to change it from the default shown.
 
 # Only look at these organizations (or users). Omit to include everything you can see.
 # orgs = ["acme"]

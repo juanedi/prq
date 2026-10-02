@@ -21,7 +21,7 @@ It opens http://localhost:4747 in your browser (pass `--no-open`, or set `open_b
 
 ## Configure
 
-Optional: `./config.toml` or `~/.config/docket/config.toml` (or `--config <path>`).
+Optional: `./config.toml` or `~/.config/docket/config.toml` (or `--config <path>`). If neither exists, docket creates the latter on launch with every setting commented out.
 
 ```toml
 orgs = ["acme"]             # default: every org you can see
