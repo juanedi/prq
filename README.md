@@ -17,9 +17,21 @@ just build
 ./target/release/prq
 ```
 
-It opens http://localhost:4747 in your browser (pass `--no-open`, or set `open_browser = false`, to skip that). `--port <port>` overrides the configured port, and `--help` lists every flag. The binary embeds the frontend. It authenticates with `GITHUB_TOKEN` if set, otherwise with `gh auth token`.
+It opens http://localhost:4747 in your browser (pass `--no-open`, or set `open_browser = false`, to skip that). `--port <port>` overrides the configured port, and `--help` lists every flag. The binary embeds the frontend.
 
 `just install` copies the binary to `~/.local/bin`, so `prq` works from anywhere.
+
+## Authenticate
+
+prq looks for a GitHub token once, at startup, and uses the first one it finds:
+
+1. The `GITHUB_TOKEN` environment variable.
+2. The `GH_TOKEN` environment variable.
+3. The output of `gh auth token`, i.e. the account the [GitHub CLI](https://cli.github.com) is logged into.
+
+If you already use `gh`, there is nothing to set up. Otherwise run `gh auth login`, or export a token that can read the pull requests you want to see (private repositories need the `repo` scope on a classic token).
+
+The token is held in memory and only sent to `api.github.com`.
 
 ## Configure
 
