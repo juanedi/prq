@@ -17,6 +17,8 @@ just build
 
 Open http://localhost:4747. The binary embeds the frontend. It authenticates with `GITHUB_TOKEN` if set, otherwise with `gh auth token`.
 
+`just install` copies the binary to `~/.local/bin`, so `docket` works from anywhere.
+
 ## Configure
 
 Optional: `./config.toml` or `~/.config/docket/config.toml` (or `--config <path>`).

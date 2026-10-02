@@ -17,6 +17,10 @@ build:
     cd web && npm install && npm run build
     cargo build --release
 
+# Copy the binary to ~/.local/bin
+install: build
+    cargo install --path . --root ~/.local --locked
+
 check:
     mkdir -p web/dist
     cargo fmt --check
