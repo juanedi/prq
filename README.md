@@ -35,6 +35,6 @@ open_browser = true
 
 ## Develop
 
-`just setup` once, then `just dev` (backend on :4747, Vite with hot reload on :5173) and `just check`.
+`just setup` once, then `just dev` (backend on :4747, Vite with hot reload on :5173, or on the port in `VITE_DEV`) and `just check`.
 
 Press `?` in the app for keyboard shortcuts.

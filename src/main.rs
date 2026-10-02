@@ -113,7 +113,7 @@ async fn asset(uri: Uri) -> Response {
         }
         None => (
             StatusCode::NOT_FOUND,
-            "Frontend not built. Run `just build`, or `just dev` and open http://localhost:5173.",
+            "Frontend not built. Run `just build`, or `just dev` and open the Vite dev server (http://localhost:5173 by default).",
         )
             .into_response(),
     }

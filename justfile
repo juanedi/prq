@@ -4,7 +4,7 @@ default: build
 setup:
     cd web && npm install
 
-# Backend on :4747 and Vite dev server on :5173 (proxying /api)
+# Backend on :4747 and Vite dev server on :5173 (proxying /api); VITE_DEV overrides the Vite port
 dev:
     #!/usr/bin/env bash
     trap 'kill 0' EXIT
