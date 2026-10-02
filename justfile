@@ -12,7 +12,7 @@ dev:
     cargo run -- --no-open &
     cd web && npm run dev
 
-# Single binary with the frontend embedded, at target/release/docket
+# Single binary with the frontend embedded, at target/release/prq
 build:
     cd web && npm install && npm run build
     cargo build --release

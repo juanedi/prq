@@ -153,7 +153,7 @@ pub struct Client {
 impl Client {
     pub fn new() -> Result<Client> {
         Ok(Client {
-            http: reqwest::Client::builder().user_agent("docket").build()?,
+            http: reqwest::Client::builder().user_agent("prq").build()?,
             token: token()?,
         })
     }

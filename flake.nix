@@ -1,5 +1,5 @@
 {
-  description = "Docket: a local dashboard for GitHub review requests";
+  description = "prq: a local dashboard for GitHub review requests";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";

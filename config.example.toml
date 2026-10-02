@@ -1,4 +1,4 @@
-# Docket reads ./config.toml, then ~/.config/docket/config.toml.
+# prq reads ./config.toml, then ~/.config/prq/config.toml.
 # Every setting is optional; uncomment one to change it from the default shown.
 
 # Only look at these organizations (or users). Omit to include everything you can see.

@@ -137,7 +137,7 @@ async fn main() -> Result<()> {
 
     let listener = tokio::net::TcpListener::bind(("127.0.0.1", port)).await?;
     let url = format!("http://localhost:{port}");
-    println!("Docket is running at {url}");
+    println!("prq is running at {url}");
     if open_browser {
         if let Err(error) = open::that_detached(&url) {
             eprintln!("could not open the browser: {error}");

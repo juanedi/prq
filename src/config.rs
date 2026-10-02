@@ -27,7 +27,7 @@ impl Default for Config {
 }
 
 impl Config {
-    /// `--config <path>` wins, then ./config.toml, then ~/.config/docket/config.toml.
+    /// `--config <path>` wins, then ./config.toml, then ~/.config/prq/config.toml.
     pub fn load() -> Result<Config> {
         let mut args = std::env::args().skip(1);
         let mut explicit = None;
@@ -40,7 +40,7 @@ impl Config {
                 "--no-open" => no_open = true,
                 other => {
                     anyhow::bail!(
-                        "unknown argument: {other}\nusage: docket [--config <path>] [--no-open]"
+                        "unknown argument: {other}\nusage: prq [--config <path>] [--no-open]"
                     )
                 }
             }
@@ -103,7 +103,7 @@ fn user_path() -> Option<PathBuf> {
     let config_home = std::env::var_os("XDG_CONFIG_HOME")
         .map(PathBuf::from)
         .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".config")))?;
-    Some(config_home.join("docket/config.toml"))
+    Some(config_home.join("prq/config.toml"))
 }
 
 /// Writes the template, with every setting commented out, so new users discover the file.

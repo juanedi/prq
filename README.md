@@ -1,4 +1,4 @@
-# Docket
+# prq
 
 A local dashboard for the GitHub pull requests waiting on your review.
 
@@ -12,16 +12,16 @@ Stacked pull requests are grouped and joined by a rail.
 ```sh
 direnv allow   # or: nix develop
 just build
-./target/release/docket
+./target/release/prq
 ```
 
 It opens http://localhost:4747 in your browser (pass `--no-open`, or set `open_browser = false`, to skip that). The binary embeds the frontend. It authenticates with `GITHUB_TOKEN` if set, otherwise with `gh auth token`.
 
-`just install` copies the binary to `~/.local/bin`, so `docket` works from anywhere.
+`just install` copies the binary to `~/.local/bin`, so `prq` works from anywhere.
 
 ## Configure
 
-Optional: `./config.toml` or `~/.config/docket/config.toml` (or `--config <path>`). If neither exists, docket creates the latter on launch with every setting commented out.
+Optional: `./config.toml` or `~/.config/prq/config.toml` (or `--config <path>`). If neither exists, prq creates the latter on launch with every setting commented out.
 
 ```toml
 orgs = ["acme"]             # default: every org you can see

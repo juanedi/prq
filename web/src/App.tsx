@@ -9,8 +9,8 @@ const STALE_MS = 3 * 24 * 60 * 60 * 1000;
 const CHAIN_PREVIEW = 3;
 const TOAST_MS = 1600;
 const WARNING_MS = 4500;
-const SNOOZE_KEY = "docket:snoozed";
-const COLLAPSE_KEY = "docket:collapse-chains";
+const SNOOZE_KEY = "prq:snoozed";
+const COLLAPSE_KEY = "prq:collapse-chains";
 
 const SHORTCUTS: [string[], string][] = [
   [["j", "↓"], "Next pull request"],
@@ -307,7 +307,7 @@ export function App() {
 
   useEffect(() => {
     const count = data?.needs_you.filter((i) => !isSnoozed(i.url)).length;
-    document.title = count ? `(${count}) Docket` : "Docket";
+    document.title = count ? `(${count}) prq` : "prq";
   }, [data, isSnoozed]);
 
   useEffect(() => {
@@ -497,7 +497,7 @@ export function App() {
       <div className="bar">
         <span className="brand">
           <i />
-          Docket
+          prq
         </span>
         {data && <span className="chip">{scope || "All repositories"}</span>}
         <label className="filter">
