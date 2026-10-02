@@ -15,7 +15,7 @@ just build
 ./target/release/docket
 ```
 
-Open http://localhost:4747. The binary embeds the frontend. It authenticates with `GITHUB_TOKEN` if set, otherwise with `gh auth token`.
+It opens http://localhost:4747 in your browser (pass `--no-open`, or set `open_browser = false`, to skip that). The binary embeds the frontend. It authenticates with `GITHUB_TOKEN` if set, otherwise with `gh auth token`.
 
 `just install` copies the binary to `~/.local/bin`, so `docket` works from anywhere.
 
@@ -28,6 +28,7 @@ orgs = ["acme"]             # default: every org you can see
 repos = ["acme/web", "api"] # default: every repo; bare names match in any org
 port = 4747
 refresh_seconds = 300
+open_browser = true
 ```
 
 ## Develop

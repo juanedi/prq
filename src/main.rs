@@ -123,6 +123,7 @@ async fn asset(uri: Uri) -> Response {
 async fn main() -> Result<()> {
     let config = config::Config::load()?;
     let port = config.port;
+    let open_browser = config.open_browser;
     let app = Arc::new(App {
         config,
         github: github::Client::new()?,
@@ -135,7 +136,13 @@ async fn main() -> Result<()> {
         .with_state(app);
 
     let listener = tokio::net::TcpListener::bind(("127.0.0.1", port)).await?;
-    println!("Docket is running at http://localhost:{port}");
+    let url = format!("http://localhost:{port}");
+    println!("Docket is running at {url}");
+    if open_browser {
+        if let Err(error) = open::that_detached(&url) {
+            eprintln!("could not open the browser: {error}");
+        }
+    }
     axum::serve(listener, router).await?;
     Ok(())
 }

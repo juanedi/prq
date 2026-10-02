@@ -9,7 +9,7 @@ dev:
     #!/usr/bin/env bash
     trap 'kill 0' EXIT
     mkdir -p web/dist
-    cargo run &
+    cargo run -- --no-open &
     cd web && npm run dev
 
 # Single binary with the frontend embedded, at target/release/docket

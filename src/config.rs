@@ -9,6 +9,7 @@ pub struct Config {
     pub repos: Vec<String>,
     pub port: u16,
     pub refresh_seconds: u64,
+    pub open_browser: bool,
 }
 
 impl Default for Config {
@@ -18,6 +19,7 @@ impl Default for Config {
             repos: vec![],
             port: 4747,
             refresh_seconds: 300,
+            open_browser: true,
         }
     }
 }
@@ -27,17 +29,29 @@ impl Config {
     pub fn load() -> Result<Config> {
         let mut args = std::env::args().skip(1);
         let mut explicit = None;
+        let mut no_open = false;
         while let Some(arg) = args.next() {
             match arg.as_str() {
                 "--config" | "-c" => {
                     explicit = Some(PathBuf::from(args.next().context("--config needs a path")?))
                 }
+                "--no-open" => no_open = true,
                 other => {
-                    anyhow::bail!("unknown argument: {other}\nusage: docket [--config <path>]")
+                    anyhow::bail!(
+                        "unknown argument: {other}\nusage: docket [--config <path>] [--no-open]"
+                    )
                 }
             }
         }
 
+        let mut config = Config::read(explicit)?;
+        if no_open {
+            config.open_browser = false;
+        }
+        Ok(config)
+    }
+
+    fn read(explicit: Option<PathBuf>) -> Result<Config> {
         let candidates = default_paths();
         let path = match explicit {
             Some(path) => Some(path),

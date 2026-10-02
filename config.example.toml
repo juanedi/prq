@@ -9,3 +9,6 @@
 
 # port = 4747
 # refresh_seconds = 300
+
+# Open the dashboard in the browser on launch. `--no-open` overrides this.
+# open_browser = true
