@@ -26,28 +26,68 @@ impl Default for Config {
     }
 }
 
-impl Config {
-    /// `--config <path>` wins, then ./config.toml, then ~/.config/prq/config.toml.
-    pub fn load() -> Result<Config> {
-        let mut args = std::env::args().skip(1);
-        let mut explicit = None;
-        let mut no_open = false;
+const USAGE: &str = "usage: prq [--config <path>] [--port <port>] [--no-open]";
+
+const HELP: &str = "\
+A local dashboard for the GitHub pull requests waiting on your review.
+
+usage: prq [options]
+
+options:
+  -c, --config <path>  Config file to use instead of ./config.toml or
+                       ~/.config/prq/config.toml
+  -p, --port <port>    Port to listen on, overriding the config file (default: 4747)
+      --no-open        Don't open the dashboard in the browser
+  -h, --help           Print this help";
+
+#[derive(Debug, Default, PartialEq)]
+struct Args {
+    config: Option<PathBuf>,
+    port: Option<u16>,
+    no_open: bool,
+    help: bool,
+}
+
+impl Args {
+    fn parse(mut args: impl Iterator<Item = String>) -> Result<Args> {
+        let mut parsed = Args::default();
         while let Some(arg) = args.next() {
             match arg.as_str() {
                 "--config" | "-c" => {
-                    explicit = Some(PathBuf::from(args.next().context("--config needs a path")?))
+                    parsed.config =
+                        Some(PathBuf::from(args.next().context("--config needs a path")?))
                 }
-                "--no-open" => no_open = true,
-                other => {
-                    anyhow::bail!(
-                        "unknown argument: {other}\nusage: prq [--config <path>] [--no-open]"
+                "--port" | "-p" => {
+                    let port = args.next().context("--port needs a port number")?;
+                    parsed.port = Some(
+                        port.parse()
+                            .with_context(|| format!("invalid port: {port}"))?,
                     )
                 }
+                "--no-open" => parsed.no_open = true,
+                "--help" | "-h" => parsed.help = true,
+                other => anyhow::bail!("unknown argument: {other}\n{USAGE}"),
             }
         }
+        Ok(parsed)
+    }
+}
 
-        let mut config = Config::read(explicit)?;
-        if no_open {
+impl Config {
+    /// `--config <path>` wins, then ./config.toml, then ~/.config/prq/config.toml.
+    /// Flags override the corresponding settings in the file.
+    pub fn load() -> Result<Config> {
+        let args = Args::parse(std::env::args().skip(1))?;
+        if args.help {
+            println!("{HELP}");
+            std::process::exit(0);
+        }
+
+        let mut config = Config::read(args.config)?;
+        if let Some(port) = args.port {
+            config.port = port;
+        }
+        if args.no_open {
             config.open_browser = false;
         }
         Ok(config)
@@ -144,6 +184,34 @@ mod tests {
         assert!(!config.allows("acme/docs"));
         assert!(!config.allows("other/web"));
         assert!(Config::default().allows("anyone/anything"));
+    }
+
+    fn parse(args: &[&str]) -> Result<Args> {
+        Args::parse(args.iter().map(|arg| arg.to_string()))
+    }
+
+    #[test]
+    fn parses_flags() {
+        assert_eq!(parse(&[]).unwrap(), Args::default());
+        assert_eq!(
+            parse(&["--port", "8080", "-c", "a.toml", "--no-open"]).unwrap(),
+            Args {
+                config: Some(PathBuf::from("a.toml")),
+                port: Some(8080),
+                no_open: true,
+                help: false,
+            }
+        );
+        assert!(parse(&["-h"]).unwrap().help);
+        assert!(parse(&["--help"]).unwrap().help);
+    }
+
+    #[test]
+    fn rejects_bad_flags() {
+        assert!(parse(&["--port"]).is_err());
+        assert!(parse(&["--port", "http"]).is_err());
+        assert!(parse(&["--port", "70000"]).is_err());
+        assert!(parse(&["--nope"]).is_err());
     }
 
     #[test]

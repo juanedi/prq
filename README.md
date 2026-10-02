@@ -17,7 +17,7 @@ just build
 ./target/release/prq
 ```
 
-It opens http://localhost:4747 in your browser (pass `--no-open`, or set `open_browser = false`, to skip that). The binary embeds the frontend. It authenticates with `GITHUB_TOKEN` if set, otherwise with `gh auth token`.
+It opens http://localhost:4747 in your browser (pass `--no-open`, or set `open_browser = false`, to skip that). `--port <port>` overrides the configured port, and `--help` lists every flag. The binary embeds the frontend. It authenticates with `GITHUB_TOKEN` if set, otherwise with `gh auth token`.
 
 `just install` copies the binary to `~/.local/bin`, so `prq` works from anywhere.
 
