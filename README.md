@@ -1,5 +1,7 @@
 # prq
 
+[![CI](https://github.com/juanedi/prq/actions/workflows/ci.yml/badge.svg)](https://github.com/juanedi/prq/actions/workflows/ci.yml)
+
 A local dashboard for the GitHub pull requests waiting on your review.
 
 - **Needs you**: your review is requested and nobody else has reviewed yet (bots don't count), or you were re-requested.

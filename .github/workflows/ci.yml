@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: nix develop -c bash -e {0}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: cachix/install-nix-action@v31
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+            ~/.npm
+          key: ${{ runner.os }}-${{ hashFiles('flake.lock', 'Cargo.lock', 'web/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-
+
+      # The backend embeds web/dist at compile time, so the frontend goes first.
+      - name: Build frontend
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+
+      - name: Check
+        run: just check
+
+      - name: Test
+        run: cargo test --locked
