@@ -23,7 +23,7 @@ It opens http://localhost:4747 in your browser (pass `--no-open`, or set `open_b
 
 ## Configure
 
-Optional: `./config.toml` or `~/.config/prq/config.toml` (or `--config <path>`). If neither exists, prq creates the latter on launch with every setting commented out.
+Optional: `~/.config/prq/config.toml` (or `--config <path>`). If it doesn't exist, prq creates it on launch with every setting commented out.
 
 ```toml
 orgs = ["acme"]             # default: every org you can see

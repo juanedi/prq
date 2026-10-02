@@ -34,8 +34,7 @@ A local dashboard for the GitHub pull requests waiting on your review.
 usage: prq [options]
 
 options:
-  -c, --config <path>  Config file to use instead of ./config.toml or
-                       ~/.config/prq/config.toml
+  -c, --config <path>  Config file to use instead of ~/.config/prq/config.toml
   -p, --port <port>    Port to listen on, overriding the config file (default: 4747)
       --no-open        Don't open the dashboard in the browser
   -h, --help           Print this help";
@@ -74,7 +73,7 @@ impl Args {
 }
 
 impl Config {
-    /// `--config <path>` wins, then ./config.toml, then ~/.config/prq/config.toml.
+    /// Reads `--config <path>` if given, otherwise ~/.config/prq/config.toml.
     /// Flags override the corresponding settings in the file.
     pub fn load() -> Result<Config> {
         let args = Args::parse(std::env::args().skip(1))?;
@@ -94,11 +93,7 @@ impl Config {
     }
 
     fn read(explicit: Option<PathBuf>) -> Result<Config> {
-        let candidates = default_paths();
-        let path = match explicit {
-            Some(path) => Some(path),
-            None => candidates.iter().find(|p| p.exists()).cloned(),
-        };
+        let path = explicit.or_else(|| user_path().filter(|path| path.exists()));
         let Some(path) = path else {
             init_user_config();
             return Ok(Config::default());
@@ -131,12 +126,6 @@ impl Config {
                 .any(|r| r.eq_ignore_ascii_case(name_with_owner) || r.eq_ignore_ascii_case(name));
         org_ok && repo_ok
     }
-}
-
-fn default_paths() -> Vec<PathBuf> {
-    let mut paths = vec![PathBuf::from("config.toml")];
-    paths.extend(user_path());
-    paths
 }
 
 fn user_path() -> Option<PathBuf> {
