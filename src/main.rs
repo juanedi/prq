@@ -41,8 +41,8 @@ struct App {
 
 #[derive(Deserialize)]
 struct QueueParams {
-    #[serde(default)]
-    force: bool,
+    /// Oldest snapshot the caller accepts, in seconds. Capped at `refresh_seconds`.
+    max_age: Option<u64>,
 }
 
 async fn fetch(app: &App) -> Result<Snapshot> {
@@ -75,9 +75,10 @@ async fn fetch(app: &App) -> Result<Snapshot> {
 async fn get_queue(State(app): State<Arc<App>>, Query(params): Query<QueueParams>) -> Response {
     // Holding the lock across the fetch keeps concurrent requests from hitting GitHub twice.
     let mut cache = app.cache.lock().await;
-    let max_age = Duration::from_secs(app.config.refresh_seconds);
+    let refresh = app.config.refresh_seconds;
+    let max_age = Duration::from_secs(params.max_age.map_or(refresh, |s| s.min(refresh)));
     if let Some((at, snapshot)) = cache.as_ref() {
-        if !params.force && at.elapsed() < max_age {
+        if at.elapsed() < max_age {
             return Json(snapshot.as_ref()).into_response();
         }
     }

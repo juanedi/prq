@@ -2,6 +2,8 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import type { Item, Person, Reviewer, Snapshot } from "./types";
 
 const POLL_MS = 30_000;
+/** Returning to the tab refreshes anything older than this. */
+const FOCUS_MAX_AGE_S = 60;
 const STALE_MS = 3 * 24 * 60 * 60 * 1000;
 /** Chains with more members than this in a section collapse to their first few. */
 const CHAIN_PREVIEW = 3;
@@ -34,10 +36,12 @@ function useQueue() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const load = useCallback(async (force = false) => {
+  /** `maxAgeSeconds` is the oldest snapshot to accept; omit it to use the server's refresh interval. */
+  const load = useCallback(async (maxAgeSeconds?: number) => {
     setBusy(true);
     try {
-      const response = await fetch(`/api/queue${force ? "?force=true" : ""}`);
+      const query = maxAgeSeconds === undefined ? "" : `?max_age=${maxAgeSeconds}`;
+      const response = await fetch(`/api/queue${query}`);
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? response.statusText);
       setData(body);
@@ -52,7 +56,7 @@ function useQueue() {
   useEffect(() => {
     load();
     const timer = setInterval(() => load(), POLL_MS);
-    const onFocus = () => load();
+    const onFocus = () => load(FOCUS_MAX_AGE_S);
     window.addEventListener("focus", onFocus);
     return () => {
       clearInterval(timer);
@@ -419,7 +423,7 @@ export function App() {
         s: () => current && snoozeItem(current),
         z: () => setShowSnoozed(snoozed.length > 0),
         E: toggleCollapseChains,
-        r: () => load(true),
+        r: () => load(0),
         "/": () => filterInput.current?.focus(),
         "?": () => setHelp((open) => !open),
       };
@@ -517,7 +521,7 @@ export function App() {
           <i />
           Collapse chains
         </button>
-        <button className="sync" onClick={() => load(true)} title="Refresh (r)">
+        <button className="sync" onClick={() => load(0)} title="Refresh (r)">
           <span className={busy ? "dot busy" : error ? "dot error" : "dot"} />
           {data ? `Synced ${ago(data.fetched_at, now)}` : busy ? "Loading" : "Not synced"}
         </button>

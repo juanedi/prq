@@ -27,7 +27,7 @@ Optional: `./config.toml` or `~/.config/docket/config.toml` (or `--config <path>
 orgs = ["acme"]             # default: every org you can see
 repos = ["acme/web", "api"] # default: every repo; bare names match in any org
 port = 4747
-refresh_seconds = 60
+refresh_seconds = 300
 ```
 
 ## Develop

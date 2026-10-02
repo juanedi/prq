@@ -17,7 +17,7 @@ impl Default for Config {
             orgs: vec![],
             repos: vec![],
             port: 4747,
-            refresh_seconds: 60,
+            refresh_seconds: 300,
         }
     }
 }

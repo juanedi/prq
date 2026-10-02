@@ -8,4 +8,4 @@
 # repos = ["acme/web", "api"]
 
 # port = 4747
-# refresh_seconds = 60
+# refresh_seconds = 300
